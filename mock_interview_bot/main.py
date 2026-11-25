@@ -31,6 +31,7 @@ def generate_skill_based_question(skill, role="", difficulty="medium"):
     role_context = f" for a {role} position" if role else ""
     prompt = f"""Generate ONE technical interview question that specifically tests a candidate's
 knowledge of "{skill}"{role_context}.
+The candidate is a fresher (final-year student, 0-1 years of experience). Ask a beginner-friendly, practical question on ONE basic concept that can be answered in 3-5 sentences. Do not ask multi-part or advanced questions.
 Difficulty level: {difficulty}.
 Only output the question, nothing else."""
 
