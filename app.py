@@ -1,5 +1,6 @@
 import streamlit as st
 import importlib.util
+import io
 import os
 import json
 import hashlib
@@ -140,13 +141,24 @@ def get_interview_avg():
             interview_scores.append(score)
     return (sum(interview_scores) / len(interview_scores)) if interview_scores else None
 
+def _read_and_delete(path):
+    """Audio file padhke turant delete kar deta hai (temp files jama nahi hoti)"""
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
 def speak_button(text, lang, key):
     """Translated text ko audio mein sunane ke liye button"""
     if st.button("🔊 Suno", key=key):
         try:
             with st.spinner("Audio ban raha hai..."):
                 audio_file = ml_main.text_to_speech(text, lang)
-            audio_bytes = open(audio_file, "rb").read()
+            audio_bytes = _read_and_delete(audio_file)
             st.audio(audio_bytes, format="audio/mp3")
         except Exception:
             st.warning("Is language mein audio abhi available nahi hai.")
@@ -163,7 +175,7 @@ def auto_speak(text, lang, unique_key):
         try:
             audio_file = ml_main.text_to_speech(text, lang)
             if audio_file:
-                audio_bytes = open(audio_file, "rb").read()
+                audio_bytes = _read_and_delete(audio_file)
                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
         except Exception:
             pass
@@ -178,7 +190,7 @@ def autoplay_once(text, lang):
     if text and text not in st.session_state.played_texts:
         try:
             audio_file = ml_main.text_to_speech(text, lang)
-            audio_bytes = open(audio_file, "rb").read()
+            audio_bytes = _read_and_delete(audio_file)
             st.audio(audio_bytes, format="audio/mp3", autoplay=True)
             st.session_state.played_texts.add(text)
         except Exception:
@@ -300,14 +312,10 @@ elif page == "resume":
 
     if st.button(tr("Analyze", current_lang)):
         if uploaded_file and jd_text:
-            data_folder = os.path.join("resume_analyzer", "data")
-            os.makedirs(data_folder, exist_ok=True)
-            temp_path = os.path.join(data_folder, "temp_resume.pdf")
+            # Resume disk pe save nahi hota (memory mein hi padha jata hai), isliye users ke beech overlap nahi hota
+            resume_file = io.BytesIO(uploaded_file.getvalue())
 
-            with open(temp_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-
-            score, matched, missing, resume_skills = ra_main.analyze_resume(temp_path, jd_text)
+            score, matched, missing, resume_skills = ra_main.analyze_resume(resume_file, jd_text)
 
             if not resume_skills and score == 0:
                 st.error(tr("Couldn't extract text from the resume. The PDF may be a scanned image or corrupted — try a text-based PDF.", current_lang))
