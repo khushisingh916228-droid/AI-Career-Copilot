@@ -26,12 +26,43 @@ Only output the question, nothing else."""
 
     return safe_generate(prompt)
 
+LEVELS = ["easy", "medium", "hard"]
+
+LEVEL_GUIDES = {
+    "easy": "Ask a beginner-friendly question on ONE basic concept (a definition or simple use) that can be answered in 2-4 sentences.",
+    "medium": "Ask a practical question on ONE concept, such as how you would use it in a small real task, answerable in 4-6 sentences.",
+    "hard": "Ask a short scenario-based question where the candidate must pick an approach and justify it, still on ONE concept and answerable in 5-8 sentences.",
+}
+
+def get_next_difficulty(answers):
+    """Pichle jawabon ke score se agla level nikalta hai (score 7+ upar, 4 ya kam neeche).
+    Question number ka cap bhi lagta hai: Q1-3 easy, Q4-7 tak medium, hard sirf Q8+.
+    Score kisi ka na mile to sirf cap (question number) se level milta hai."""
+    idx = len(answers)
+    cap = 0 if idx < 3 else (1 if idx < 7 else 2)
+    level = 0
+    scored = False
+    for a in answers:
+        s = a.get("score")
+        if s is None:
+            continue
+        scored = True
+        if s >= 7:
+            level += 1
+        elif s <= 4:
+            level -= 1
+        level = max(0, min(2, level))
+    if not scored:
+        return LEVELS[cap]
+    return LEVELS[min(level, cap)]
+
 def generate_skill_based_question(skill, role="", difficulty="medium"):
     """Skill Gap se aayi ek specific skill pe question banata hai"""
     role_context = f" for a {role} position" if role else ""
+    level_guide = LEVEL_GUIDES.get(str(difficulty).lower(), LEVEL_GUIDES["easy"])
     prompt = f"""Generate ONE technical interview question that specifically tests a candidate's
 knowledge of "{skill}"{role_context}.
-The candidate is a fresher (final-year student, 0-1 years of experience). Ask a beginner-friendly, practical question on ONE basic concept that can be answered in 3-5 sentences. Do not ask multi-part or advanced questions.
+The candidate is a fresher (final-year student, 0-1 years of experience). {level_guide}
 Difficulty level: {difficulty}.
 Only output the question, nothing else."""
 
