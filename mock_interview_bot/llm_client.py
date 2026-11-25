@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 GROQ_MODEL = "openai/gpt-oss-120b"
-GEMINI_MODEL = "gemini-2.0-flash"  # <-- yahan apne main.py wala model naam rakho
+GEMINI_MODEL = "gemini-3.6-flash"  # <-- yahan apne main.py wala model naam rakho
 
 
 def _ask_groq(prompt, system, temperature):

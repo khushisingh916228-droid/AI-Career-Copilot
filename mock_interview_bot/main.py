@@ -1,26 +1,23 @@
-import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 import re
+import sys
 
-# .env file se API key load karo
+# app.py is file ko load_module se kholta hai, isliye apna folder path mein jodna zaroori hai
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from llm_client import ask_llm
+
 load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
-
-# Gemini ko configure karo (3.6-flash: is account ke liye available model, daily quota limited hai)
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-3.6-flash")
 
 def safe_generate(prompt):
-    """Gemini call ko safely wrap karta hai - quota khatam hone pe crash nahi karta"""
+    """AI call ko safely wrap karta hai: pehle Groq, fail ho to Gemini. Crash nahi karta."""
     try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        return ask_llm(prompt)
     except Exception as e:
         error_str = str(e)
         if "429" in error_str or "quota" in error_str.lower() or "ResourceExhausted" in error_str:
-            return "⚠️ Daily API limit khatam ho gaya hai. Thodi der baad (ya kal) dobara try karo."
-        return f"⚠️ Kuch error aaya: {error_str[:150]}"
+            return "\u26a0\ufe0f Daily API limit khatam ho gaya hai. Thodi der baad (ya kal) dobara try karo."
+        return f"\u26a0\ufe0f Kuch error aaya: {error_str[:150]}"
 
 def generate_interview_question(role, difficulty="medium"):
     prompt = f"""Generate ONE technical interview question for a {role}.
