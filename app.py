@@ -439,7 +439,7 @@ elif page == "interview":
 
                     if st.session_state.p_question is None:
                         target_role = st.session_state.get("target_role", "")
-                        st.session_state.p_question = mib_main.generate_skill_based_question(current_skill, target_role)
+                        st.session_state.p_question = mib_main.generate_skill_based_question(current_skill, target_role, mib_main.get_next_difficulty(st.session_state.queue_answers))
 
                     translated_q = tr(st.session_state.p_question, current_lang)
                     st.subheader(tr("Question:", current_lang))
