@@ -22,10 +22,12 @@ def translate_text(text, target_language="hi", max_retries=5):
             else:
                 return text  # translate na ho paye to original text hi dikhao, error message nahi
 
-def text_to_speech(text, language="hi", output_file="output.mp3"):
+import os, tempfile, uuid
+
+def text_to_speech(text, language="hi", output_file=None):
     try:
         tts = gTTS(text=text, lang=language)
-        tts.save(output_file)
+        output_file = output_file or os.path.join(tempfile.gettempdir(), f"tts_{uuid.uuid4().hex}.mp3"); tts.save(output_file)
         return output_file
     except Exception:
         return None
