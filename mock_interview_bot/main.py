@@ -109,7 +109,7 @@ def generate_adaptive_question(role, history):
     last_score = history[-1]["score"] if history else None
 
     if last_score is None:
-        difficulty_hint = "Start with a medium difficulty question."
+        difficulty_hint = "Start with an EASY, beginner-level question (a basic definition or simple use of one concept)."
     elif last_score <= 5:
         difficulty_hint = "The candidate struggled with the last question. Ask an EASIER question on the SAME topic to reinforce understanding."
     elif last_score <= 7:
@@ -123,6 +123,8 @@ Interview history so far:
 {history_text if history_text else "No questions asked yet."}
 
 {difficulty_hint}
+
+The candidate is a fresher (final-year student, 0-1 years of experience). Keep the question focused on ONE concept and answerable in a few sentences. Do not ask system-design or multi-part questions unless the candidate scored 8 or more on recent answers.
 
 Generate ONE technical interview question. Only output the question, nothing else."""
 
