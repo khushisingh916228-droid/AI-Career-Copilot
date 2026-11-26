@@ -14,60 +14,57 @@ def load_module(name, path):
 
 st.set_page_config(page_title="AI Career Copilot", page_icon="🎯", layout="wide")
 
-# ---------- LOGIN / SIGNUP (local file based, basic security) ----------
-USERS_FILE = "users.json"
+# ---------- LOGIN / SIGNUP (Supabase Auth) ----------
+# Har browser session ka apna Supabase client st.session_state mein rehta hai (shared nahi),
+# isliye ek user ka login doosre user ko kabhi nahi milta.
+import auth_client
 
-def load_users():
-    if not os.path.exists(USERS_FILE):
-        return {}
-    try:
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-def save_users(users):
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f)
-
-def hash_password(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
+def _start_session(email, client):
+    st.session_state.logged_in = True
+    st.session_state.sb_client = client
+    st.session_state.user_email = email
+    st.session_state.username = email.split("@")[0]
 
 def login_gate():
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
 
     if not st.session_state.logged_in:
-        st.title("🎯 AI Career Copilot")
+        st.title("\U0001F3AF AI Career Copilot")
         st.write("Login karo ya naya account banao.")
 
-        tab1, tab2 = st.tabs(["🔐 Login", "🆕 Sign Up"])
+        tab1, tab2 = st.tabs(["\U0001F510 Login", "\U0001F195 Sign Up"])
 
         with tab1:
-            login_user = st.text_input("Username", key="login_user")
+            login_email = st.text_input("Email", key="login_email")
             login_pass = st.text_input("Password", type="password", key="login_pass")
             if st.button("Login"):
-                users = load_users()
-                if login_user in users and users[login_user] == hash_password(login_pass):
-                    st.session_state.logged_in = True
-                    st.session_state.username = login_user
-                    st.rerun()
+                if not login_email or not login_pass:
+                    st.warning("Email aur password dono bharo.")
                 else:
-                    st.error("Galat username ya password.")
+                    ok, msg, client = auth_client.sign_in(login_email.strip(), login_pass)
+                    if ok:
+                        _start_session(login_email.strip(), client)
+                        st.rerun()
+                    else:
+                        st.error(msg)
 
         with tab2:
-            new_user = st.text_input("Naya Username", key="signup_user")
-            new_pass = st.text_input("Naya Password", type="password", key="signup_pass")
+            new_email = st.text_input("Email", key="signup_email")
+            new_pass = st.text_input("Naya Password (8+ characters, letters aur digits)", type="password", key="signup_pass")
+            new_pass2 = st.text_input("Password dobara", type="password", key="signup_pass2")
             if st.button("Sign Up"):
-                users = load_users()
-                if not new_user or not new_pass:
-                    st.warning("Username aur password dono bharo.")
-                elif new_user in users:
-                    st.error("Ye username already hai, doosra try karo.")
+                if not new_email or not new_pass:
+                    st.warning("Email aur password dono bharo.")
+                elif new_pass != new_pass2:
+                    st.error("Dono password match nahi karte.")
                 else:
-                    users[new_user] = hash_password(new_pass)
-                    save_users(users)
-                    st.success("Account ban gaya! Ab 'Login' tab se login karo.")
+                    ok, msg, client = auth_client.sign_up(new_email.strip(), new_pass)
+                    if ok:
+                        _start_session(new_email.strip(), client)
+                        st.rerun()
+                    else:
+                        st.error(msg)
 
         st.stop()
 
@@ -256,8 +253,8 @@ page = st.sidebar.radio(t("nav_label"), page_ids, format_func=lambda pid: t(pid)
 st.sidebar.markdown("---")
 st.sidebar.write(f"👤 {st.session_state.username}")
 if st.sidebar.button(f"🚪 {tr('Logout', current_lang)}"):
-    st.session_state.logged_in = False
-    st.session_state.pop("username", None)
+    auth_client.sign_out(st.session_state.get("sb_client"))
+    st.session_state.clear()  # is user ka saara data hata do, agle user ko na dikhe
     st.rerun()
 
 # ================= PAGES =================
