@@ -4,10 +4,24 @@ import speech_recognition as sr
 import os
 import time
 
+import threading
+
+_last_call = [0.0]
+_lock = threading.Lock()
+MIN_INTERVAL = 0.4  # seconds between Google requests (about 2.5 per second, below the 5 per second limit)
+
+def _throttle():
+    with _lock:
+        wait = MIN_INTERVAL - (time.time() - _last_call[0])
+        if wait > 0:
+            time.sleep(wait)
+        _last_call[0] = time.time()
+
 # Language codes: en=English, hi=Hindi, pa=Punjabi
-def translate_text(text, target_language="hi", max_retries=5):
+def translate_text(text, target_language="hi", max_retries=5, raise_on_fail=False):
     for attempt in range(1, max_retries + 1):
         try:
+            _throttle()
             translated = GoogleTranslator(source="auto", target=target_language).translate(text)
             
             if translated and ("Error 500" in translated or "Server Error" in translated):
@@ -18,8 +32,10 @@ def translate_text(text, target_language="hi", max_retries=5):
         except Exception as e:
             print(f"Attempt {attempt} failed ({target_language}): {e}")
             if attempt < max_retries:
-                time.sleep(attempt * 1.5)  # progressively lamba wait: 1.5s, 3s, 4.5s, 6s...
+                time.sleep(attempt * 1.5)  # progressively longer wait: 1.5s, 3s, 4.5s, 6s...
             else:
+                if raise_on_fail:
+                    raise
                 return text  # if translation fails, show the original text, not an error message
 
 import os, tempfile, uuid

@@ -116,11 +116,25 @@ def t(key):
     return tr(english_text, lang)  # other languages use dynamic Google Translate
 
 @st.cache_data(show_spinner=False)
+def _tr_cached(text, lang):
+    # Raises on failure, so a failed translation is never cached
+    return ml_main.translate_text(text, lang, max_retries=2, raise_on_fail=True)
+
+import json as _json
+try:
+    with open("translations.json", "r", encoding="utf-8") as _f:
+        STATIC_TR = _json.load(_f)
+except Exception:
+    STATIC_TR = {}
+
 def tr(text, lang):
     if not text or lang == "en":
         return text
+    hit = STATIC_TR.get(lang, {}).get(text)
+    if hit:
+        return hit
     try:
-        return ml_main.translate_text(text, lang)
+        return _tr_cached(text, lang)
     except Exception:
         return text
 
@@ -235,15 +249,6 @@ lang_display = {
     "English": "en",
     "हिंदी (Hindi)": "hi",
     "ਪੰਜਾਬੀ (Punjabi)": "pa",
-    "भोजपुरी (Bhojpuri)": "bho",
-    "मराठी (Marathi)": "mr",
-    "ગુજરાતી (Gujarati)": "gu",
-    "বাংলা (Bengali)": "bn",
-    "தமிழ் (Tamil)": "ta",
-    "తెలుగు (Telugu)": "te",
-    "ಕನ್ನಡ (Kannada)": "kn",
-    "മലയാളം (Malayalam)": "ml",
-    "اردو (Urdu)": "ur",
 }
 chosen_lang_label = st.sidebar.selectbox("🌐 Language (applies to all modules)", list(lang_display.keys()))
 st.session_state.interface_lang = lang_display[chosen_lang_label]
