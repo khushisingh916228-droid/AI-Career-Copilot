@@ -585,66 +585,123 @@ elif page == "interview":
                 st.write(f"{tr('Score', current_lang)}: {item['score']}/10")
                 st.markdown("---")
 
-    # ============ ROLE-BASED MODE (original flow) ============
+    # ============ ROLE-BASED MODE (10 questions, progress bar, summary) ============
     else:
-        role = st.text_input(tr("Job Role", current_lang), placeholder="e.g. Machine Learning Engineer")
-        st.session_state.target_role = role
-        difficulty = st.selectbox(tr("Difficulty Level", current_lang), ["Easy", "Medium", "Hard"])
+        RB_TOTAL = 10
+        if "rb_active" not in st.session_state:
+            st.session_state.rb_active = False
+            st.session_state.rb_run = 0
 
-        if "question" not in st.session_state:
-            st.session_state.question = None
+        if not st.session_state.rb_active:
+            role = st.text_input(tr("Job Role", current_lang), placeholder="e.g. Machine Learning Engineer", key="rb_role_input")
+            difficulty = st.selectbox(tr("Difficulty Level", current_lang), ["Easy", "Medium", "Hard"], key="rb_difficulty_input")
 
-        if role and not st.session_state.question:
-            st.markdown("### 🎓 " + tr("Interview Summary", current_lang))
-            st.info(
-                f"**{tr('Mode', current_lang)}:** {tr('Role-Based Interview', current_lang)}\n\n"
-                f"**{tr('Subject', current_lang)}:** {role} ({difficulty})"
-            )
-            ira_msg = mib_main.get_ira_greeting("Role-Based Interview", role)
-            translated_greeting = tr(ira_msg, current_lang)
-            st.write("🎙️ " + translated_greeting)
-            auto_speak(translated_greeting, current_lang, "greeting_rolebased")
-
-        if st.button(tr("Generate Question", current_lang)):
             if role:
-                st.session_state.question = mib_main.generate_interview_question(role, difficulty)
-                st.session_state.feedback = None
-            else:
-                st.warning(tr("Please enter a role first!", current_lang))
+                st.markdown("### \U0001F393 " + tr("Interview Summary", current_lang))
+                st.info(
+                    f"**{tr('Mode', current_lang)}:** {tr('Role-Based Interview', current_lang)}\n\n"
+                    f"**{tr('Subject', current_lang)}:** {role} ({difficulty})"
+                )
+                ira_msg = mib_main.get_ira_greeting("Role-Based Interview", role)
+                translated_greeting = tr(ira_msg, current_lang)
+                st.write("\U0001F399\ufe0f " + translated_greeting)
+                auto_speak(translated_greeting, current_lang, "greeting_rolebased")
 
-        if st.session_state.question:
-            translated_question = tr(st.session_state.question, current_lang)
-            st.subheader(tr("Interview Question:", current_lang))
-            st.write(translated_question)
-            auto_speak(translated_question, current_lang, f"autoq_r_{st.session_state.question[:30]}")
-            speak_button(translated_question, current_lang, "speak_question")
-
-            answer = mic_text_area(tr("Your Answer", current_lang), "interview_answer", current_lang)
-
-            if st.button(tr("Submit Answer", current_lang)):
-                if answer:
-                    with st.spinner(tr("Evaluating your answer...", current_lang)):
-                        st.session_state.feedback = mib_main.evaluate_answer(st.session_state.question, answer, role)
+            if st.button(tr("Start Interview", current_lang)):
+                if role:
+                    st.session_state.rb_active = True
+                    st.session_state.rb_run += 1
+                    st.session_state.rb_role = role
+                    st.session_state.rb_difficulty = difficulty
+                    st.session_state.rb_index = 0
+                    st.session_state.rb_history = []
+                    st.session_state.rb_question = None
+                    st.session_state.rb_feedback = None
+                    st.session_state.target_role = role
+                    st.rerun()
                 else:
-                    st.warning(tr("Please write an answer first!", current_lang))
+                    st.warning(tr("Please enter a role first!", current_lang))
+        else:
+            role = st.session_state.rb_role
+            difficulty = st.session_state.rb_difficulty
+            idx = st.session_state.rb_index
+            run = st.session_state.rb_run
 
-            if st.session_state.get("feedback"):
-                translated_feedback = tr(st.session_state.feedback, current_lang)
-                st.subheader("🎙️ " + tr("Ira's Feedback:", current_lang))
-                st.write(translated_feedback)
-                speak_button(translated_feedback, current_lang, "speak_feedback")
+            if idx < RB_TOTAL:
+                st.progress(idx / RB_TOTAL)
+                st.caption(f"{tr('Question', current_lang)} {idx + 1} / {RB_TOTAL} - {role} ({difficulty})")
 
-                # Also track the Role-Based interview score for Career Insights
-                rb_score = mib_main.extract_score(st.session_state.feedback)
-                if rb_score is not None:
-                    if "rolebased_scores" not in st.session_state:
-                        st.session_state.rolebased_scores = []
-                    if "rolebased_logged_questions" not in st.session_state:
-                        st.session_state.rolebased_logged_questions = []
-                    already_logged = st.session_state.question in st.session_state.rolebased_logged_questions
-                    if not already_logged:
-                        st.session_state.rolebased_scores.append(rb_score)
-                        st.session_state.rolebased_logged_questions.append(st.session_state.question)
+                if st.session_state.rb_question is None:
+                    asked = [h["question"] for h in st.session_state.rb_history]
+                    with st.spinner(tr("Preparing the next question...", current_lang)):
+                        q = mib_main.generate_interview_question(role, difficulty)
+                        for _ in range(2):
+                            if q not in asked:
+                                break
+                            q = mib_main.generate_interview_question(role, difficulty)
+                    st.session_state.rb_question = q
+
+                translated_q = tr(st.session_state.rb_question, current_lang)
+                st.subheader(tr("Interview Question:", current_lang))
+                st.write(translated_q)
+                auto_speak(translated_q, current_lang, f"autoq_r_{run}_{idx}")
+                speak_button(translated_q, current_lang, f"speak_rq_{run}_{idx}")
+
+                rb_answer = mic_text_area(tr("Your Answer", current_lang), f"rb_answer_{run}_{idx}", current_lang)
+
+                if st.button(tr("Submit Answer", current_lang), key=f"submit_rb_{run}_{idx}"):
+                    if rb_answer:
+                        with st.spinner(tr("Evaluating your answer...", current_lang)):
+                            st.session_state.rb_feedback = mib_main.evaluate_answer(st.session_state.rb_question, rb_answer, role)
+                    else:
+                        st.warning(tr("Please write an answer first!", current_lang))
+
+                if st.session_state.rb_feedback:
+                    translated_fb = tr(st.session_state.rb_feedback, current_lang)
+                    st.subheader("\U0001F399\ufe0f " + tr("Ira's Feedback:", current_lang))
+                    st.write(translated_fb)
+                    speak_button(translated_fb, current_lang, f"speak_rfb_{run}_{idx}")
+
+                    if idx + 1 >= RB_TOTAL:
+                        next_label = tr("Finish Interview", current_lang)
+                    else:
+                        next_label = tr("Next Question \u27a1\ufe0f", current_lang)
+
+                    if st.button(next_label, key=f"next_rb_{run}_{idx}"):
+                        rb_score = mib_main.extract_score(st.session_state.rb_feedback)
+                        st.session_state.rb_history.append({
+                            "question": st.session_state.rb_question,
+                            "answer": rb_answer,
+                            "feedback": st.session_state.rb_feedback,
+                            "score": rb_score,
+                        })
+                        if rb_score is not None:
+                            if "rolebased_scores" not in st.session_state:
+                                st.session_state.rolebased_scores = []
+                            st.session_state.rolebased_scores.append(rb_score)
+                        st.session_state.rb_index += 1
+                        st.session_state.rb_question = None
+                        st.session_state.rb_feedback = None
+                        st.rerun()
+
+                st.markdown("---")
+                if st.button(tr("End Interview", current_lang), key=f"end_rb_{run}_{idx}"):
+                    st.session_state.rb_active = False
+                    st.rerun()
+            else:
+                st.progress(1.0)
+                st.success(tr("Interview complete! Here is your summary:", current_lang))
+                scores = [h["score"] for h in st.session_state.rb_history if h["score"] is not None]
+                if scores:
+                    st.metric(tr("Average Score", current_lang), f"{sum(scores) / len(scores):.1f} / 10")
+                for i, item in enumerate(st.session_state.rb_history):
+                    st.markdown(f"**{i + 1}. {tr(item['question'], current_lang)}**")
+                    score_text = f"{item['score']}/10" if item["score"] is not None else "-"
+                    st.write(f"{tr('Score', current_lang)}: {score_text}")
+                    st.markdown("---")
+                if st.button(tr("Start a New Interview", current_lang)):
+                    st.session_state.rb_active = False
+                    st.rerun()
 
 elif page == "skillgap":
     st.title(tr("🧠 Skill Gap Analysis", current_lang))
