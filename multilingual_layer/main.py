@@ -70,6 +70,36 @@ def speech_to_text(language="en-IN"):
     except Exception as e:
         return f"There was a problem with the microphone: {str(e)[:100]}"
 
+_google_blocked_until = [0.0]
+_LANG_NAMES = {"hi": "Hindi (Devanagari script)", "pa": "Punjabi (Gurmukhi script)"}
+
+def _translate_with_llm(text, target_language):
+    """Fallback translation with the LLM (Groq first, Gemini second) when Google Translate is blocked."""
+    import sys
+    llm_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mock_interview_bot")
+    if llm_dir not in sys.path:
+        sys.path.insert(0, llm_dir)
+    from llm_client import ask_llm
+    name = _LANG_NAMES.get(target_language, target_language)
+    prompt = (
+        "Translate the following text from English into " + name + ". "
+        "Keep emojis, numbers, code, and technical terms (AI, SQL, API, PDF) unchanged. "
+        "Return ONLY the translation, with no quotes and no explanation.\n\n" + text
+    )
+    return ask_llm(prompt, temperature=0.2)
+
+def translate_smart(text, target_language):
+    """Google Translate first. If Google blocks us, skip it for 5 minutes and use the LLM instead.
+    Raises if both fail, so a failed translation is never cached."""
+    if not text or target_language == "en":
+        return text
+    if time.time() >= _google_blocked_until[0]:
+        try:
+            return translate_text(text, target_language, max_retries=1, raise_on_fail=True)
+        except Exception:
+            _google_blocked_until[0] = time.time() + 300
+    return _translate_with_llm(text, target_language)
+
 def process_text(text, target_language="hi"):
     """
     Takes a text, translates it, and also generates audio.

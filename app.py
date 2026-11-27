@@ -118,7 +118,7 @@ def t(key):
 @st.cache_data(show_spinner=False)
 def _tr_cached(text, lang):
     # Raises on failure, so a failed translation is never cached
-    return ml_main.translate_text(text, lang, max_retries=2, raise_on_fail=True)
+    return ml_main.translate_smart(text, lang)
 
 import json as _json
 try:

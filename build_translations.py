@@ -1,14 +1,16 @@
 import ast
 import json
 import os
+import re
 import sys
 import time
 
-sys.path.insert(0, "multilingual_layer")
-import main as ml
+sys.path.insert(0, "mock_interview_bot")
+from llm_client import ask_llm
 
-LANGS = ["hi", "pa"]
+LANGS = {"hi": "Hindi (Devanagari script)", "pa": "Punjabi (Gurmukhi script)"}
 OUT = "translations.json"
+BATCH = 20
 
 with open("app.py", encoding="utf-8") as f:
     tree = ast.parse(f.read())
@@ -25,8 +27,11 @@ print("fixed strings found:", len(strings))
 
 data = {}
 if os.path.exists(OUT):
-    with open(OUT, encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(OUT, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
 
 
 def save():
@@ -34,21 +39,44 @@ def save():
         json.dump(data, f, ensure_ascii=False, indent=1)
 
 
-for lang in LANGS:
+def translate_batch(batch, lang_name):
+    prompt = (
+        "Translate each UI text below from English into " + lang_name + ". "
+        "Keep emojis, numbers, brand names and technical terms (AI, ATS, PDF, SQL, Gemini) in English where natural. "
+        "Return ONLY a JSON array of strings, with the same length and order as the input, and no explanation.\n\n"
+        + json.dumps(batch, ensure_ascii=False)
+    )
+    raw = ask_llm(prompt, temperature=0.2)
+    m = re.search(r"\[.*\]", raw, re.S)
+    arr = json.loads(m.group(0))
+    if not isinstance(arr, list) or len(arr) != len(batch):
+        raise ValueError("length mismatch")
+    return [str(x) for x in arr]
+
+
+for lang, lang_name in LANGS.items():
     done = data.setdefault(lang, {})
     todo = [s for s in strings if s not in done]
     print(lang, "to translate:", len(todo))
     failed = 0
-    for i, s in enumerate(todo, 1):
-        try:
-            done[s] = ml.translate_text(s, lang, max_retries=3, raise_on_fail=True)
-        except Exception:
-            failed += 1
-            time.sleep(5)
-        if i % 20 == 0:
-            save()
-            print(lang, i, "/", len(todo))
-    save()
+    for i in range(0, len(todo), BATCH):
+        batch = todo[i:i + BATCH]
+        ok = False
+        for attempt in range(3):
+            try:
+                out = translate_batch(batch, lang_name)
+                for s, tr_text in zip(batch, out):
+                    done[s] = tr_text
+                ok = True
+                break
+            except Exception as e:
+                print("retry", lang, i, type(e).__name__)
+                time.sleep(5)
+        if not ok:
+            failed += len(batch)
+        save()
+        print(lang, min(i + BATCH, len(todo)), "/", len(todo))
+        time.sleep(2)
     print(lang, "failed:", failed)
 
 print("finished")
