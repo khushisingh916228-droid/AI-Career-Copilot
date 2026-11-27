@@ -1,4 +1,4 @@
-# Roles categorized aur unki required skills
+# Roles by category and their required skills
 
 ROLE_SKILLS = {
     # AI / Machine Learning
@@ -118,7 +118,7 @@ def get_skill_gap(user_skills, target_role):
     return matched, missing, percentage
 
 def get_priority_skills(missing_skills):
-    """Missing skills ko High/Medium/Low priority mein divide karta hai."""
+    """Divides the missing skills into High/Medium/Low priority."""
     skills = sorted(missing_skills)
     n = len(skills)
     if n == 0:
@@ -132,11 +132,11 @@ def get_priority_skills(missing_skills):
     return high, medium, low
 
 def get_skill_recommendation(skill):
-    """Ek skill ke liye 'kya seekho, kaise practice karo' deta hai."""
+    """Returns what to learn and how to practice for one skill."""
     key = skill.lower()
     if key in SKILL_RECOMMENDATIONS:
         return SKILL_RECOMMENDATIONS[key]
     return {
-        "learn": f"{skill.title()} ke fundamentals aur core concepts",
-        "practice": f"Online courses ya tutorials se {skill.title()} seekho, fir ek chhota project banao"
+        "learn": f"Fundamentals and core concepts of {skill.title()}",
+        "practice": f"Learn {skill.title()} from online courses or tutorials, then build a small project"
     }

@@ -15,7 +15,7 @@ skills_list = [
 ]
 
 def extract_text_from_pdf(pdf_path):
-    """PDF se text nikalta hai. Corrupt/password-protected/scanned PDF ho to bhi crash nahi hota."""
+    """Extracts text from a PDF. Does not crash on corrupt, password-protected or scanned PDFs."""
     try:
         with pdfplumber.open(pdf_path) as pdf:
             text = ""

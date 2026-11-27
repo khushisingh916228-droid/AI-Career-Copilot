@@ -2,10 +2,10 @@ import streamlit as st
 from main import analyze_resume
 
 st.title("🎯 AI Resume Analyzer")
-st.write("Apna resume upload karo aur job description paste karo — match score turant milega!")
+st.write("Upload your resume and paste the job description — you will get your match score instantly!")
 
-uploaded_file = st.file_uploader("Resume upload karo (PDF)", type="pdf")
-jd_text = st.text_area("Job Description paste karo yahan")
+uploaded_file = st.file_uploader("Upload your resume (PDF)", type="pdf")
+jd_text = st.text_area("Paste the job description here")
 
 if st.button("Analyze"):
     if uploaded_file and jd_text:
@@ -25,7 +25,7 @@ if st.button("Analyze"):
                 for skill in sorted(matched):
                     st.markdown(f"- {skill.title()}")
             else:
-                st.write("Koi match nahi mila")
+                st.write("No matches found")
 
         with col2:
             st.markdown("### ❌ Missing Skills")
@@ -33,7 +33,7 @@ if st.button("Analyze"):
                 for skill in sorted(missing):
                     st.markdown(f"- {skill.title()}")
             else:
-                st.write("Sab skills match ho gayi! 🎉")
+                st.write("All skills matched! 🎉")
     else:
-        st.warning("Please resume upload karo aur JD bhi paste karo!")
+        st.warning("Please upload a resume and paste the job description!")
         

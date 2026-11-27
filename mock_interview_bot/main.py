@@ -3,21 +3,21 @@ import os
 import re
 import sys
 
-# app.py is file ko load_module se kholta hai, isliye apna folder path mein jodna zaroori hai
+# app.py loads this file with load_module, so this folder must be added to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from llm_client import ask_llm
 
 load_dotenv()
 
 def safe_generate(prompt):
-    """AI call ko safely wrap karta hai: pehle Groq, fail ho to Gemini. Crash nahi karta."""
+    """Wraps the AI call safely: Groq first, Gemini if it fails. Never crashes."""
     try:
         return ask_llm(prompt)
     except Exception as e:
         error_str = str(e)
         if "429" in error_str or "quota" in error_str.lower() or "ResourceExhausted" in error_str:
-            return "\u26a0\ufe0f Daily API limit khatam ho gaya hai. Thodi der baad (ya kal) dobara try karo."
-        return f"\u26a0\ufe0f Kuch error aaya: {error_str[:150]}"
+            return "\u26a0\ufe0f The daily API limit has been reached. Please try again later (or tomorrow)."
+        return f"\u26a0\ufe0f Something went wrong: {error_str[:150]}"
 
 def generate_interview_question(role, difficulty="medium"):
     prompt = f"""Generate ONE technical interview question for a {role}.
@@ -35,9 +35,9 @@ LEVEL_GUIDES = {
 }
 
 def get_next_difficulty(answers):
-    """Pichle jawabon ke score se agla level nikalta hai (score 7+ upar, 4 ya kam neeche).
-    Question number ka cap bhi lagta hai: Q1-3 easy, Q4-7 tak medium, hard sirf Q8+.
-    Score kisi ka na mile to sirf cap (question number) se level milta hai."""
+    """Works out the next level from the scores of previous answers (score 7+ goes up, 4 or below goes down).
+    A question-number cap also applies: Q1-3 easy, up to medium for Q4-7, hard only from Q8.
+    If no answer has a score, the level comes only from the cap (question number)."""
     idx = len(answers)
     cap = 0 if idx < 3 else (1 if idx < 7 else 2)
     level = 0
@@ -57,7 +57,7 @@ def get_next_difficulty(answers):
     return LEVELS[min(level, cap)]
 
 def generate_skill_based_question(skill, role="", difficulty="medium"):
-    """Skill Gap se aayi ek specific skill pe question banata hai"""
+    """Generates a question for a specific skill that came from the Skill Gap"""
     role_context = f" for a {role} position" if role else ""
     level_guide = LEVEL_GUIDES.get(str(difficulty).lower(), LEVEL_GUIDES["easy"])
     prompt = f"""Generate ONE technical interview question that specifically tests a candidate's
@@ -70,8 +70,8 @@ Only output the question, nothing else."""
 
 def build_personalized_queue(missing_skills, total_questions=10):
     """
-    Missing skills ki list leke, unme total_questions ko proportionally
-    distribute karta hai. Har skill ko kam se kam 1 question milta hai.
+    Takes the list of missing skills and distributes total_questions proportionally
+    among them. Every skill gets at least 1 question.
     """
     skills = sorted(missing_skills)
     n = len(skills)
@@ -97,7 +97,7 @@ def build_personalized_queue(missing_skills, total_questions=10):
 def generate_adaptive_question(role, history):
     """
     history: list of dicts [{"question":..., "answer":..., "score":...}, ...]
-    Pichle performance ke hisaab se agla question ka topic/difficulty decide karta hai.
+    Decides the topic/difficulty of the next question based on past performance.
     """
     history_text = ""
     for h in history[-3:]:
@@ -139,7 +139,7 @@ def get_ira_greeting(mode, subject):
     )
 
 def extract_score(feedback_text):
-    """Feedback text se 'Overall Score: X/10' (ya purana 'Score: X/10') nikal ke number return karta hai"""
+    """Extracts the number from 'Overall Score: X/10' (or the older 'Score: X/10') in the feedback text"""
     match = re.search(r"Overall Score:\s*(\d+(?:\.\d+)?)\s*/\s*10", feedback_text)
     if match:
         return float(match.group(1))
@@ -150,7 +150,7 @@ def extract_score(feedback_text):
     return None
 
 def evaluate_answer(question, answer, role):
-    """Ira ki tarah, multi-criteria grading ke saath detailed feedback deti hai"""
+    """Gives detailed feedback with multi-criteria grading, like Ira"""
     prompt = f"""You are Ira, a friendly but thorough AI interviewer evaluating a candidate for a {role} position.
 
 Question asked: {question}
@@ -169,7 +169,7 @@ Improvements: [1-2 lines about what could be better]
 
     return safe_generate(prompt)
 
-# Testing ke liye
+# For testing
 if __name__ == "__main__":
     role = "Machine Learning Engineer"
 

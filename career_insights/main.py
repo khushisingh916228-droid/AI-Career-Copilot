@@ -1,8 +1,8 @@
 def compute_readiness(resume_score, skillgap_pct, interview_avg):
     """
-    Teeno scores ko combine karke ek overall 'career readiness' score deta hai.
+    Combines the three scores into one overall 'career readiness' score.
     Weights: Resume 30%, Skill Gap 40%, Interview 30%
-    Jo bhi score available nahi hai, usko skip karke baaki se calculate hota hai.
+    Any score that is not available is skipped, and the result is calculated from the rest.
     """
     valid_scores = []
     weights = []
@@ -14,7 +14,7 @@ def compute_readiness(resume_score, skillgap_pct, interview_avg):
         valid_scores.append(skillgap_pct)
         weights.append(0.4)
     if interview_avg is not None:
-        valid_scores.append(interview_avg * 10)  # /10 ko /100 scale mein convert kiya
+        valid_scores.append(interview_avg * 10)  # convert the /10 score to a /100 scale
         weights.append(0.3)
 
     if not valid_scores:

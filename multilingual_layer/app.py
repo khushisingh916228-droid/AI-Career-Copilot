@@ -4,53 +4,53 @@ from main import translate_text, text_to_speech, speech_to_text
 st.set_page_config(page_title="Multilingual Layer", page_icon="🌐")
 
 st.title("🌐 Multilingual Layer")
-st.write("Apna text likho ya bolo, aur Hindi/Punjabi mein translate + suno.")
+st.write("Type or speak your text, then translate it into Hindi/Punjabi and listen to it.")
 
-# Language select karne ka option
+# Language selection
 language_options = {"English": "en", "Hindi": "hi", "Punjabi": "pa"}
 selected_language = st.selectbox("Target language chuno:", list(language_options.keys()))
 lang_code = language_options[selected_language]
 
-# Tab se choose karo: type karo ya bolo
-input_method = st.radio("Input kaise doge?", ["Type karo", "Mic se bolo"])
+# Choose the input method: type or speak
+input_method = st.radio("How would you like to give input?", ["Type", "Speak with mic"])
 
 user_text = ""
 
-if input_method == "Type karo":
-    user_text = st.text_area("Apna text yahan likho:", "")
+if input_method == "Type":
+    user_text = st.text_area("Enter your text here:", "")
     
-    if st.button("Translate karo"):
+    if st.button("Translate"):
         if user_text.strip() == "":
-            st.warning("Pehle kuch text likho.")
+            st.warning("Please enter some text first.")
         else:
-            with st.spinner("Translate ho raha hai..."):
+            with st.spinner("Translating..."):
                 translated = translate_text(user_text, lang_code)
             
             st.subheader(f"Translated ({selected_language}):")
             st.write(translated)
             
-            with st.spinner("Audio ban raha hai..."):
+            with st.spinner("Generating audio..."):
                 audio_file = text_to_speech(translated, lang_code)
             
             audio_bytes = open(audio_file, "rb").read()
             st.audio(audio_bytes, format="audio/mp3")
 
-else:  # Mic se bolo
-    if st.button("Bolna shuru karo"):
-        with st.spinner("Sun rahi hoon... bolo"):
+else:  # Speak with mic
+    if st.button("Start speaking"):
+        with st.spinner("Listening... please speak"):
             spoken = speech_to_text()
         
         st.subheader("Tumne bola:")
         st.write(spoken)
         
-        if spoken and "Samajh nahi aaya" not in spoken and "Internet connection" not in spoken:
-            with st.spinner("Translate ho raha hai..."):
+        if spoken and "Could not understand" not in spoken and "your internet connection" not in spoken:
+            with st.spinner("Translating..."):
                 translated = translate_text(spoken, lang_code)
             
             st.subheader(f"Translated ({selected_language}):")
             st.write(translated)
             
-            with st.spinner("Audio ban raha hai..."):
+            with st.spinner("Generating audio..."):
                 audio_file = text_to_speech(translated, lang_code)
             
             audio_bytes = open(audio_file, "rb").read()

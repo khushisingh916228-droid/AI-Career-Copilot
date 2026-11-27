@@ -15,8 +15,8 @@ def load_module(name, path):
 st.set_page_config(page_title="AI Career Copilot", page_icon="🎯", layout="wide")
 
 # ---------- LOGIN / SIGNUP (Supabase Auth) ----------
-# Har browser session ka apna Supabase client st.session_state mein rehta hai (shared nahi),
-# isliye ek user ka login doosre user ko kabhi nahi milta.
+# Each browser session keeps its own Supabase client in st.session_state (never shared),
+# so one user's login can never be picked up by another user.
 import auth_client
 
 def _start_session(email, client):
@@ -31,7 +31,7 @@ def login_gate():
 
     if not st.session_state.logged_in:
         st.title("\U0001F3AF AI Career Copilot")
-        st.write("Login karo ya naya account banao.")
+        st.write("Log in or create a new account.")
 
         tab1, tab2 = st.tabs(["\U0001F510 Login", "\U0001F195 Sign Up"])
 
@@ -40,7 +40,7 @@ def login_gate():
             login_pass = st.text_input("Password", type="password", key="login_pass")
             if st.button("Login"):
                 if not login_email or not login_pass:
-                    st.warning("Email aur password dono bharo.")
+                    st.warning("Please enter both email and password.")
                 else:
                     ok, msg, client = auth_client.sign_in(login_email.strip(), login_pass)
                     if ok:
@@ -51,13 +51,13 @@ def login_gate():
 
         with tab2:
             new_email = st.text_input("Email", key="signup_email")
-            new_pass = st.text_input("Naya Password (8+ characters, letters aur digits)", type="password", key="signup_pass")
-            new_pass2 = st.text_input("Password dobara", type="password", key="signup_pass2")
+            new_pass = st.text_input("New password (8+ characters, letters and digits)", type="password", key="signup_pass")
+            new_pass2 = st.text_input("Confirm password", type="password", key="signup_pass2")
             if st.button("Sign Up"):
                 if not new_email or not new_pass:
-                    st.warning("Email aur password dono bharo.")
+                    st.warning("Please enter both email and password.")
                 elif new_pass != new_pass2:
-                    st.error("Dono password match nahi karte.")
+                    st.error("The two passwords do not match.")
                 else:
                     ok, msg, client = auth_client.sign_up(new_email.strip(), new_pass)
                     if ok:
@@ -113,7 +113,7 @@ def t(key):
     english_text = TRANSLATIONS["en"][key]
     if lang in TRANSLATIONS:
         return TRANSLATIONS[lang][key]
-    return tr(english_text, lang)  # baaki languages ke liye dynamic Google Translate use hoga
+    return tr(english_text, lang)  # other languages use dynamic Google Translate
 
 @st.cache_data(show_spinner=False)
 def tr(text, lang):
@@ -125,7 +125,7 @@ def tr(text, lang):
         return text
 
 def get_interview_avg():
-    """Teeno interview modes (Personalized + Adaptive + Role-Based) ke scores ka average"""
+    """Average score across all three interview modes (Personalized + Adaptive + Role-Based)"""
     interview_scores = []
     for item in st.session_state.get("queue_answers", []):
         if item.get("score") is not None:
@@ -139,7 +139,7 @@ def get_interview_avg():
     return (sum(interview_scores) / len(interview_scores)) if interview_scores else None
 
 def _read_and_delete(path):
-    """Audio file padhke turant delete kar deta hai (temp files jama nahi hoti)"""
+    """Reads an audio file and deletes it right away (so temp files do not pile up)"""
     try:
         with open(path, "rb") as f:
             return f.read()
@@ -150,20 +150,20 @@ def _read_and_delete(path):
             pass
 
 def speak_button(text, lang, key):
-    """Translated text ko audio mein sunane ke liye button"""
-    if st.button("🔊 Suno", key=key):
+    """Button that plays the translated text as audio"""
+    if st.button("🔊 Listen", key=key):
         try:
-            with st.spinner("Audio ban raha hai..."):
+            with st.spinner("Generating audio..."):
                 audio_file = ml_main.text_to_speech(text, lang)
             audio_bytes = _read_and_delete(audio_file)
             st.audio(audio_bytes, format="audio/mp3")
         except Exception:
-            st.warning("Is language mein audio abhi available nahi hai.")
+            st.warning("Audio is not available for this language yet.")
 
 def auto_speak(text, lang, unique_key):
     """
-    Ira ki tarah khud-ba-khud bolta hai (autoplay) - button click ki zaroorat nahi.
-    Same text/question dobara autoplay na ho isliye ek 'already played' set track karta hai.
+    Speaks automatically like Ira (autoplay), no button click needed.
+    Tracks an 'already played' set so the same text/question is not autoplayed again.
     """
     if "auto_played" not in st.session_state:
         st.session_state.auto_played = set()
@@ -179,8 +179,8 @@ def auto_speak(text, lang, unique_key):
         st.session_state.auto_played.add(unique_key)
 
 def autoplay_once(text, lang):
-    """Text ko AUTOMATICALLY bol deta hai (bina button dabaye), lekin sirf ek baar per unique text —
-    isse baar baar rerun hone pe wahi audio dobara nahi bajega."""
+    """Speaks the text AUTOMATICALLY (no button press), but only once per unique text —
+    so reruns do not replay the same audio."""
     if "played_texts" not in st.session_state:
         st.session_state.played_texts = set()
 
@@ -194,8 +194,16 @@ def autoplay_once(text, lang):
             pass
 
 
+# Dropdown language -> Google speech recognition language code.
+# Bhojpuri has no Google speech code, so it falls back to Hindi.
+MIC_LANG = {
+    "en": "en-IN", "hi": "hi-IN", "pa": "pa-Guru-IN", "bho": "hi-IN",
+    "mr": "mr-IN", "gu": "gu-IN", "bn": "bn-IN", "ta": "ta-IN",
+    "te": "te-IN", "kn": "kn-IN", "ml": "ml-IN", "ur": "ur-IN",
+}
+
 def mic_text_area(label, key, lang, placeholder=""):
-    """Text area jisme type karo YA mic se bolo, dono chalega. Mic error ho to bhi crash nahi hota."""
+    """Text area where you can type OR speak into the mic. A mic error never crashes the app."""
     if key not in st.session_state:
         st.session_state[key] = ""
 
@@ -203,12 +211,12 @@ def mic_text_area(label, key, lang, placeholder=""):
     with col2:
         st.write("")
         st.write("")
-        if st.button("🎤 Bolo", key=f"{key}_mic_btn"):
+        if st.button("🎤 Speak", key=f"{key}_mic_btn"):
             try:
                 with st.spinner(tr("Listening... speak now", lang)):
-                    spoken = ml_main.speech_to_text()
+                    spoken = ml_main.speech_to_text(MIC_LANG.get(lang, "en-IN"))
 
-                error_phrases = ["Samajh nahi aaya", "Internet connection", "Mic connect nahi hai", "Mic mein kuch problem"]
+                error_phrases = ["Could not understand", "your internet connection", "Microphone not connected", "problem with the microphone"]
                 if spoken and not any(p in spoken for p in error_phrases):
                     st.session_state[key] = spoken
                     st.rerun()
@@ -237,13 +245,13 @@ lang_display = {
     "മലയാളം (Malayalam)": "ml",
     "اردو (Urdu)": "ur",
 }
-chosen_lang_label = st.sidebar.selectbox("🌐 Language (sab modules ke liye)", list(lang_display.keys()))
+chosen_lang_label = st.sidebar.selectbox("🌐 Language (applies to all modules)", list(lang_display.keys()))
 st.session_state.interface_lang = lang_display[chosen_lang_label]
 current_lang = st.session_state.interface_lang
 
 st.sidebar.markdown("---")
 
-# Agar kisi button ne navigation request ki hai, to widget banne se PEHLE apply karo
+# If a button requested navigation, apply it BEFORE the widget is created
 if "nav_target" in st.session_state:
     st.session_state["current_page"] = st.session_state.pop("nav_target")
 
@@ -254,7 +262,7 @@ st.sidebar.markdown("---")
 st.sidebar.write(f"👤 {st.session_state.username}")
 if st.sidebar.button(f"🚪 {tr('Logout', current_lang)}"):
     auth_client.sign_out(st.session_state.get("sb_client"))
-    st.session_state.clear()  # is user ka saara data hata do, agle user ko na dikhe
+    st.session_state.clear()  # remove all of this user's data so the next user cannot see it
     st.rerun()
 
 # ================= PAGES =================
@@ -309,7 +317,7 @@ elif page == "resume":
 
     if st.button(tr("Analyze", current_lang)):
         if uploaded_file and jd_text:
-            # Resume disk pe save nahi hota (memory mein hi padha jata hai), isliye users ke beech overlap nahi hota
+            # The resume is never saved to disk (it is read in memory), so users cannot overlap
             resume_file = io.BytesIO(uploaded_file.getvalue())
 
             score, matched, missing, resume_skills = ra_main.analyze_resume(resume_file, jd_text)
@@ -326,7 +334,7 @@ elif page == "resume":
         else:
             st.warning(tr("Please upload a resume and paste the job description!", current_lang))
 
-    # Result render (session_state se, taaki Suno button dabane se result gayab na ho)
+    # Render the result from session_state so it does not disappear when Listen is pressed
     if "resume_score" in st.session_state:
         score = st.session_state.resume_score
         missing = st.session_state.missing_skills
@@ -517,7 +525,7 @@ elif page == "interview":
             else:
                 st.warning(tr("Please enter a role first!", current_lang))
 
-        # Interview chal raha hai (jab tak role set hai aur count < total)
+        # Interview in progress (while a role is set and count < total)
         if role and st.session_state.adaptive_count < num_questions:
             idx = st.session_state.adaptive_count
             st.progress(idx / num_questions)
@@ -621,7 +629,7 @@ elif page == "interview":
                 st.write(translated_feedback)
                 speak_button(translated_feedback, current_lang, "speak_feedback")
 
-                # Role-Based interview ka score bhi Career Insights ke liye track karo
+                # Also track the Role-Based interview score for Career Insights
                 rb_score = mib_main.extract_score(st.session_state.feedback)
                 if rb_score is not None:
                     if "rolebased_scores" not in st.session_state:
@@ -645,10 +653,10 @@ elif page == "skillgap":
         st.info(f"{tr('Skills found from resume:', current_lang)} {len(st.session_state.user_skills)}")
 
         category = st.selectbox(tr("Choose a category:", current_lang), list(sg_main.ROLE_CATEGORIES.keys()))
-        roles_in_category = sg_main.ROLE_CATEGORIES[category] + ["✍️ Apna khud likho"]
+        roles_in_category = sg_main.ROLE_CATEGORIES[category] + ["✍️ Enter my own role"]
         selected_option = st.selectbox(tr("Choose target role:", current_lang), roles_in_category)
 
-        if selected_option == "✍️ Apna khud likho":
+        if selected_option == "✍️ Enter my own role":
             target_role = st.text_input(tr("Type your target role:", current_lang), placeholder="e.g. DevOps Engineer")
         else:
             target_role = selected_option

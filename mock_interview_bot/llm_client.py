@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 GROQ_MODEL = "openai/gpt-oss-120b"
-GEMINI_MODEL = "gemini-3.6-flash"  # <-- yahan apne main.py wala model naam rakho
+GEMINI_MODEL = "gemini-3.6-flash"  # model used as the Gemini fallback
 
 
 def _ask_groq(prompt, system, temperature):
@@ -43,12 +43,12 @@ def _ask_gemini(prompt, system, temperature):
     return response.text.strip()
 
 
-# Pehle Groq, wo fail ho (limit/error) to Gemini
+# Try Groq first; if it fails (limit/error), fall back to Gemini
 PROVIDERS = [("groq", _ask_groq), ("gemini", _ask_gemini)]
 
 
 def ask_llm(prompt, system=None, temperature=0.7):
-    """Har provider ko order mein try karta hai. Sab fail hon to RuntimeError."""
+    """Tries each provider in order. Raises RuntimeError if all of them fail."""
     errors = []
     for name, fn in PROVIDERS:
         try:

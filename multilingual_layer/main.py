@@ -16,11 +16,11 @@ def translate_text(text, target_language="hi", max_retries=5):
             return translated
         
         except Exception as e:
-            print(f"Attempt {attempt} fail hua ({target_language}): {e}")
+            print(f"Attempt {attempt} failed ({target_language}): {e}")
             if attempt < max_retries:
                 time.sleep(attempt * 1.5)  # progressively lamba wait: 1.5s, 3s, 4.5s, 6s...
             else:
-                return text  # translate na ho paye to original text hi dikhao, error message nahi
+                return text  # if translation fails, show the original text, not an error message
 
 import os, tempfile, uuid
 
@@ -32,39 +32,39 @@ def text_to_speech(text, language="hi", output_file=None):
     except Exception:
         return None
 
-def speech_to_text():
-    """Mic se sunta hai. Mic disconnect/missing ho to bhi crash nahi hota."""
+def speech_to_text(language="en-IN"):
+    """Listens from the mic. Does not crash if the mic is disconnected or missing."""
     try:
         recognizer = sr.Recognizer()
         with sr.Microphone() as source:
-            print("Bolo... (listening)")
+            print("Listening... speak now")
             recognizer.adjust_for_ambient_noise(source)
             audio = recognizer.listen(source)
 
         try:
-            text = recognizer.recognize_google(audio)
+            text = recognizer.recognize_google(audio, language=language)
             return text
         except sr.UnknownValueError:
-            return "Samajh nahi aaya, dobara bolo."
+            return "Could not understand, please speak again."
         except sr.RequestError:
-            return "Internet connection check karo."
+            return "Please check your internet connection."
 
     except OSError:
-        return "Mic connect nahi hai. Headset/mic check karke wapas try karo."
+        return "Microphone not connected. Please check your headset/mic and try again."
     except Exception as e:
-        return f"Mic mein kuch problem hui: {str(e)[:100]}"
+        return f"There was a problem with the microphone: {str(e)[:100]}"
 
 def process_text(text, target_language="hi"):
     """
-    Ek text lo, translate karo, aur audio bhi bana do.
-    Streamlit UI ya app.py se easily call karne ke liye.
+    Takes a text, translates it, and also generates audio.
+    Made to be called easily from the Streamlit UI or app.py.
     Returns: (translated_text, audio_file_path)
     """
     translated = translate_text(text, target_language)
     audio_file = text_to_speech(translated, target_language)
     return translated, audio_file
 
-# Testing ke liye
+# For testing
 if __name__ == "__main__":
     original_text = "What is the difference between supervised and unsupervised learning?"
     
