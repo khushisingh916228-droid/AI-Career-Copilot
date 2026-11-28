@@ -82,6 +82,7 @@ TRANSLATIONS = {
         "interview": "🎤 Mock Interview Bot",
         "skillgap": "🧠 Skill Gap",
         "career": "📊 Career Insights",
+        "history": "\U0001F4DA My History",
         "welcome": "Welcome to AI Career Copilot 🎯",
         "welcome_sub": "Select any module from the sidebar.",
     },
@@ -93,6 +94,7 @@ TRANSLATIONS = {
         "interview": "🎤 मॉक इंटरव्यू बॉट",
         "skillgap": "🧠 स्किल गैप",
         "career": "📊 करियर इनसाइट्स",
+        "history": "\U0001F4DA \u092e\u0947\u0930\u093e \u0907\u0924\u093f\u0939\u093e\u0938",
         "welcome": "एआई करियर कोपायलट में स्वागत है 🎯",
         "welcome_sub": "साइडबार से कोई भी मॉड्यूल चुनो।",
     },
@@ -104,6 +106,7 @@ TRANSLATIONS = {
         "interview": "🎤 ਮੌਕ ਇੰਟਰਵਿਊ ਬੋਟ",
         "skillgap": "🧠 ਸਕਿੱਲ ਗੈਪ",
         "career": "📊 ਕਰੀਅਰ ਇਨਸਾਈਟਸ",
+        "history": "\U0001F4DA \u0a2e\u0a47\u0a30\u0a3e \u0a07\u0a24\u0a3f\u0a39\u0a3e\u0a38",
         "welcome": "ਏਆਈ ਕਰੀਅਰ ਕੋਪਾਇਲਟ ਵਿੱਚ ਸੁਆਗਤ ਹੈ 🎯",
         "welcome_sub": "ਸਾਈਡਬਾਰ ਤੋਂ ਕੋਈ ਵੀ ਮੋਡਿਊਲ ਚੁਣੋ।",
     },
@@ -279,7 +282,7 @@ st.sidebar.markdown("---")
 if "nav_target" in st.session_state:
     st.session_state["current_page"] = st.session_state.pop("nav_target")
 
-page_ids = ["home", "resume", "interview", "skillgap", "career"]
+page_ids = ["home", "resume", "interview", "skillgap", "career", "history"]
 page = st.sidebar.radio(t("nav_label"), page_ids, format_func=lambda pid: t(pid), key="current_page")
 
 st.sidebar.markdown("---")
@@ -943,3 +946,71 @@ elif page == "career":
         speak_button(summary_text, current_lang, "speak_career")
     else:
         st.warning(tr("Use Resume Analyzer, Skill Gap, or Mock Interview first to see your Career Insights.", current_lang))
+
+elif page == "history":
+    st.title("\U0001F4DA " + tr("My History", current_lang))
+    st.write(tr("Your saved results. Only you can see them.", current_lang))
+
+    hist_client = st.session_state.get("sb_client")
+    rows = history_store.list_results(hist_client)
+
+    hist_labels = {"all": "All", "resume": "Resume", "skillgap": "Skill Gap", "interview": "Interview"}
+    hist_choice = st.radio(
+        tr("Show:", current_lang),
+        list(hist_labels.keys()),
+        format_func=lambda k: tr(hist_labels[k], current_lang),
+        horizontal=True,
+        key="hist_filter",
+    )
+    shown = [r for r in rows if hist_choice == "all" or r["kind"] == hist_choice]
+
+    if not shown:
+        st.info(tr("Nothing saved yet. Use the Save button on a result to keep it here.", current_lang))
+
+    for r in shown:
+        d = r.get("data") or {}
+        when = str(r.get("created_at", ""))[:16].replace("T", " ") + " UTC"
+        with st.expander(f"{r['title']}  ({when})"):
+            if r["kind"] == "resume":
+                st.write(f"**{tr('Match score', current_lang)}:** {d.get('score')}%")
+                st.write(f"**{tr('Skills Found', current_lang)}:** " + (", ".join(d.get("matched", [])) or "-"))
+                st.write(f"**{tr('Missing Skills', current_lang)}:** " + (", ".join(d.get("missing", [])) or "-"))
+                if d.get("recommendation"):
+                    st.info(tr(d["recommendation"], current_lang))
+            elif r["kind"] == "skillgap":
+                st.write(f"**{tr('Target role', current_lang)}:** {d.get('role', '-')}")
+                st.write(f"**{tr('Match', current_lang)}:** {d.get('match')}%")
+                st.write(f"**{tr('Skills You Have', current_lang)}:** " + (", ".join(d.get("matched", [])) or "-"))
+                st.write(f"**{tr('Missing Skills', current_lang)}:** " + (", ".join(d.get("missing", [])) or "-"))
+            elif r["kind"] == "interview":
+                avg = d.get("average")
+                avg_text = f"{avg} / 10" if avg is not None else "-"
+                st.write(f"**{tr('Average Score', current_lang)}:** {avg_text}")
+                if d.get("role"):
+                    st.write(f"**{tr('Job Role', current_lang)}:** {d['role']}")
+                if st.toggle(tr("Show details", current_lang), key=f"det_{r['id']}"):
+                    for i, it in enumerate(d.get("items", [])):
+                        st.markdown(f"**{i + 1}. {tr(it.get('question', ''), current_lang)}**")
+                        st.write(f"{tr('Score', current_lang)}: {it.get('score')}/10")
+                        if it.get("feedback"):
+                            st.write(tr(it["feedback"], current_lang))
+                        st.markdown("---")
+
+            st.markdown("---")
+            if st.session_state.get("pending_delete") == r["id"]:
+                st.warning(tr("Delete this saved result permanently?", current_lang))
+                c_yes, c_no = st.columns(2)
+                with c_yes:
+                    if st.button(tr("Yes, delete", current_lang), key=f"yes_{r['id']}"):
+                        history_store.delete_result(hist_client, r["id"])
+                        st.session_state.pop("pending_delete", None)
+                        st.session_state.pop("saved_tokens", None)
+                        st.session_state.pop("saved_resume_key", None)
+                        st.rerun()
+                with c_no:
+                    if st.button(tr("Cancel", current_lang), key=f"no_{r['id']}"):
+                        st.session_state.pop("pending_delete", None)
+                        st.rerun()
+            elif st.button(tr("Delete", current_lang), key=f"del_{r['id']}"):
+                st.session_state["pending_delete"] = r["id"]
+                st.rerun()
