@@ -493,10 +493,17 @@ elif page == "interview":
                             st.rerun()
                 else:
                     st.success(tr("🎉 Interview complete! Here's your summary:", current_lang))
+                    scores_p = [it["score"] for it in st.session_state.queue_answers if it.get("score") is not None]
+                    if scores_p:
+                        st.metric(tr("Average Score", current_lang), f"{sum(scores_p) / len(scores_p):.1f} / 10")
                     for i, item in enumerate(st.session_state.queue_answers):
-                        st.markdown(f"**{i+1}. {item['skill'].title()}** — {tr(item['question'], current_lang)}")
-                        st.write(tr(item['feedback'], current_lang))
-                        st.markdown("---")
+                        score_text = f"{item['score']}/10" if item.get("score") is not None else "-"
+                        with st.expander(f"{i + 1}. {item['skill'].title()} ({score_text})"):
+                            st.write(tr(item["question"], current_lang))
+                            st.write(tr(item["feedback"], current_lang))
+                    if st.button(tr("Start a New Interview", current_lang), key="restart_personalized"):
+                        st.session_state.interview_queue = None
+                        st.rerun()
 
     # ============ ADAPTIVE MODE (AI adjusts topic/difficulty) ============
     elif is_adaptive:
