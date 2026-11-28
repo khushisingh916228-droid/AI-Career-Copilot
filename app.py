@@ -139,6 +139,24 @@ def tr(text, lang):
     except Exception:
         return text
 
+def save_button(kind, title, data, key):
+    """Shows a Save to my history button. Saves only when clicked, then shows a check mark."""
+    import hashlib as _h
+    import json as _j
+    lang = st.session_state.get("interface_lang", "en")
+    token = kind + ":" + _h.sha1(_j.dumps(data, sort_keys=True, default=str).encode()).hexdigest()
+    saved = st.session_state.setdefault("saved_tokens", set())
+    if token in saved:
+        st.success("\u2705 " + tr("Saved in your history", lang))
+        return
+    if st.button("\U0001F4BE " + tr("Save to my history", lang), key=key):
+        ok, msg = history_store.save_result(st.session_state.get("sb_client"), kind, title, data)
+        if ok:
+            saved.add(token)
+            st.success("\u2705 " + tr("Saved in your history", lang))
+        else:
+            st.error(tr("Could not save. Please try again.", lang))
+
 def get_interview_avg():
     """Average score across all three interview modes (Personalized + Adaptive + Role-Based)"""
     interview_scores = []
@@ -525,6 +543,19 @@ elif page == "interview":
                         with st.expander(f"{i + 1}. {item['skill'].title()} ({score_text})"):
                             st.write(tr(item["question"], current_lang))
                             st.write(tr(item["feedback"], current_lang))
+                    save_button(
+                        "interview",
+                        f"Personalized interview {sum(scores_p) / len(scores_p):.1f}/10" if scores_p else "Personalized interview",
+                        {
+                            "mode": "personalized",
+                            "average": round(sum(scores_p) / len(scores_p), 1) if scores_p else None,
+                            "items": [
+                                {"skill": it["skill"], "question": it["question"], "score": it.get("score"), "feedback": it.get("feedback")}
+                                for it in st.session_state.queue_answers
+                            ],
+                        },
+                        "save_personalized_btn",
+                    )
                     if st.button(tr("Start a New Interview", current_lang), key="restart_personalized"):
                         st.session_state.interview_queue = None
                         st.rerun()
@@ -615,6 +646,20 @@ elif page == "interview":
                 st.markdown(f"**{i+1}. {tr(item['question'], current_lang)}**")
                 st.write(f"{tr('Score', current_lang)}: {item['score']}/10")
                 st.markdown("---")
+            save_button(
+                "interview",
+                f"Adaptive interview: {role} {sum(scores) / len(scores):.1f}/10" if scores else f"Adaptive interview: {role}",
+                {
+                    "mode": "adaptive",
+                    "role": role,
+                    "average": round(sum(scores) / len(scores), 1) if scores else None,
+                    "items": [
+                        {"question": h["question"], "score": h["score"]}
+                        for h in st.session_state.adaptive_history
+                    ],
+                },
+                "save_adaptive_btn",
+            )
 
     # ============ ROLE-BASED MODE (10 questions, progress bar, summary) ============
     else:
@@ -730,6 +775,21 @@ elif page == "interview":
                     score_text = f"{item['score']}/10" if item["score"] is not None else "-"
                     st.write(f"{tr('Score', current_lang)}: {score_text}")
                     st.markdown("---")
+                save_button(
+                    "interview",
+                    f"Role-based interview: {role} {sum(scores) / len(scores):.1f}/10" if scores else f"Role-based interview: {role}",
+                    {
+                        "mode": "role_based",
+                        "role": role,
+                        "difficulty": difficulty,
+                        "average": round(sum(scores) / len(scores), 1) if scores else None,
+                        "items": [
+                            {"question": h["question"], "score": h["score"], "feedback": h["feedback"]}
+                            for h in st.session_state.rb_history
+                        ],
+                    },
+                    "save_rolebased_btn",
+                )
                 if st.button(tr("Start a New Interview", current_lang)):
                     st.session_state.rb_active = False
                     st.rerun()
@@ -824,6 +884,18 @@ elif page == "skillgap":
                 current_lang
             )
             speak_button(summary_text, current_lang, "speak_skillgap")
+
+            save_button(
+                "skillgap",
+                f"Skill gap: {st.session_state.get('target_role', '')} {percentage:.1f}%",
+                {
+                    "role": st.session_state.get("target_role", ""),
+                    "match": round(percentage, 1),
+                    "matched": sorted(matched),
+                    "missing": sorted(missing),
+                },
+                "save_skillgap_btn",
+            )
 
 elif page == "career":
     st.title(tr("📊 Career Insights", current_lang))
