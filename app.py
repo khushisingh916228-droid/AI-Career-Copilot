@@ -18,6 +18,7 @@ st.set_page_config(page_title="AI Career Copilot", page_icon="🎯", layout="wid
 # Each browser session keeps its own Supabase client in st.session_state (never shared),
 # so one user's login can never be picked up by another user.
 import auth_client
+import history_store
 
 def _start_session(email, client):
     st.session_state.logged_in = True
@@ -383,6 +384,29 @@ elif page == "resume":
             current_lang
         )
         speak_button(summary_text, current_lang, "speak_resume")
+
+        # Save button: the result is saved only when the user clicks (no resume text or PDF is stored)
+        save_key = (round(score, 1), tuple(sorted(matched_display)), tuple(sorted(missing)))
+        if st.session_state.get("saved_resume_key") == save_key:
+            st.success("\u2705 " + tr("Saved in your history", current_lang))
+        elif st.button("\U0001F4BE " + tr("Save to my history", current_lang), key="save_resume_btn"):
+            ok, msg = history_store.save_result(
+                st.session_state.get("sb_client"),
+                "resume",
+                f"Resume match {score:.1f}%",
+                {
+                    "score": round(score, 1),
+                    "matched": sorted(matched_display),
+                    "missing": sorted(missing),
+                    "skills": sorted(st.session_state.get("user_skills", [])),
+                    "recommendation": recommendation,
+                },
+            )
+            if ok:
+                st.session_state["saved_resume_key"] = save_key
+                st.success("\u2705 " + tr("Saved in your history", current_lang))
+            else:
+                st.error(tr("Could not save. Please try again.", current_lang))
 
         st.markdown("---")
         col_x, col_y = st.columns(2)
